@@ -3,6 +3,7 @@ import logging
 import sqlite3
 import asyncio
 import aiohttp
+import time
 from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
@@ -114,7 +115,13 @@ def get_main_keyboard():
 
 def get_admin_keyboard():
     return ReplyKeyboardMarkup(
-        [["💰 Add Credit", "➖ Remove Credit"], ["🚫 Ban User", "✅ Unban User"], ["📣 Broadcast", "🎟️ Create Code"], ["💰 Total Balance", "👥 Users List"], ["🔙 Back"]],
+        [
+            ["💰 Add Credit", "➖ Remove Credit"],
+            ["🚫 Ban User", "✅ Unban User"],
+            ["📣 Broadcast", "🎟️ Create Code"],
+            ["💰 Total Balance", "👥 Users List"],
+            ["🔙 Back"]
+        ],
         resize_keyboard=True
     )
 
@@ -131,9 +138,17 @@ def start(update: Update, context: CallbackContext):
         conn.commit()
         conn.close()
         if user.id == ADMIN_ID:
-            update.message.reply_text(f"👑 Admin Panel\nWelcome {user.first_name}!", parse_mode="Markdown", reply_markup=get_admin_keyboard())
+            update.message.reply_text(
+                f"👑 Admin Panel\nWelcome {user.first_name}!",
+                parse_mode="Markdown",
+                reply_markup=get_admin_keyboard()
+            )
         else:
-            update.message.reply_text(f"🔥 Welcome {user.first_name}!\n💰 Balance: 10 Credits\n📡 SMS Sender Bot", parse_mode="Markdown", reply_markup=get_main_keyboard())
+            update.message.reply_text(
+                f"🔥 Welcome {user.first_name}!\n💰 Balance: 10 Credits\n📡 SMS Sender Bot",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
     except Exception as e:
         logger.error(f"start error: {e}")
         update.message.reply_text("❌ Error. Please try again.")
@@ -162,9 +177,17 @@ def cmd_sms(update: Update, context: CallbackContext):
         user_id = update.effective_user.id
         balance = get_balance(user_id)
         if balance < 1:
-            update.message.reply_text(f"❌ Insufficient credits! Contact @{ADMIN_USERNAME}", parse_mode="Markdown", reply_markup=get_main_keyboard())
+            update.message.reply_text(
+                f"❌ Insufficient credits! Contact @{ADMIN_USERNAME}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
             return
-        update.message.reply_text("📨 Send SMS\nEnter phone number (11 digits):", parse_mode="Markdown", reply_markup=get_back_keyboard())
+        update.message.reply_text(
+            "📨 Send SMS\nEnter phone number (11 digits):",
+            parse_mode="Markdown",
+            reply_markup=get_back_keyboard()
+        )
         context.user_data['state'] = 'sms_number'
     except Exception as e:
         logger.error(f"cmd_sms error: {e}")
@@ -178,7 +201,11 @@ def sms_number(update: Update, context: CallbackContext):
             return
         context.user_data['sms_number'] = number
         context.user_data['state'] = 'sms_message'
-        update.message.reply_text(f"✅ Number: `{number}`\nNow enter your message:", parse_mode="Markdown", reply_markup=get_back_keyboard())
+        update.message.reply_text(
+            f"✅ Number: `{number}`\nNow enter your message:",
+            parse_mode="Markdown",
+            reply_markup=get_back_keyboard()
+        )
     except Exception as e:
         logger.error(f"sms_number error: {e}")
         update.message.reply_text("❌ Error. Please try again.")
@@ -199,7 +226,11 @@ def sms_message(update: Update, context: CallbackContext):
             asyncio.set_event_loop(loop)
             async def send():
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(SMS_API_URL, params={"key": SMS_API_KEY, "number": number, "msg": msg}, timeout=30) as resp:
+                    async with session.get(
+                        SMS_API_URL,
+                        params={"key": SMS_API_KEY, "number": number, "msg": msg},
+                        timeout=30
+                    ) as resp:
                         text = await resp.text()
                         return "success" in text.lower()
             success = loop.run_until_complete(send())
@@ -213,9 +244,16 @@ def sms_message(update: Update, context: CallbackContext):
             c.execute("UPDATE users SET total_sms = total_sms + 1 WHERE user_id = ?", (user_id,))
             conn.commit()
             conn.close()
-            update.message.reply_text(f"✅ SMS sent to `{number}`!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+            update.message.reply_text(
+                f"✅ SMS sent to `{number}`!",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
         else:
-            update.message.reply_text("❌ Failed to send SMS! Please try again.", reply_markup=get_main_keyboard())
+            update.message.reply_text(
+                "❌ Failed to send SMS! Please try again.",
+                reply_markup=get_main_keyboard()
+            )
         context.user_data.clear()
     except Exception as e:
         logger.error(f"sms_message error: {e}")
@@ -227,7 +265,11 @@ def profile(update: Update, context: CallbackContext):
         user_id = update.effective_user.id
         row = get_profile(user_id)
         if row:
-            update.message.reply_text(f"👤 Profile\nID: {user_id}\nBalance: {row[1]}\nSMS Sent: {row[2]}\nStatus: {row[4]}", parse_mode="Markdown", reply_markup=get_main_keyboard())
+            update.message.reply_text(
+                f"👤 Profile\nID: {user_id}\nBalance: {row[1]}\nSMS Sent: {row[2]}\nStatus: {row[4]}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
         else:
             update.message.reply_text("❌ Profile not found. Please /start again.", reply_markup=get_main_keyboard())
     except Exception as e:
@@ -240,7 +282,11 @@ def stats(update: Update, context: CallbackContext):
         user_id = update.effective_user.id
         row = get_profile(user_id)
         if row:
-            update.message.reply_text(f"📊 My Stats\nBalance: {row[1]}\nSMS Sent: {row[2]}", parse_mode="Markdown", reply_markup=get_main_keyboard())
+            update.message.reply_text(
+                f"📊 My Stats\nBalance: {row[1]}\nSMS Sent: {row[2]}",
+                parse_mode="Markdown",
+                reply_markup=get_main_keyboard()
+            )
         else:
             update.message.reply_text("❌ Stats not found.", reply_markup=get_main_keyboard())
     except Exception as e:
@@ -250,7 +296,11 @@ def stats(update: Update, context: CallbackContext):
 @check_status
 def redeem(update: Update, context: CallbackContext):
     try:
-        update.message.reply_text("🎟 Enter redeem code:", parse_mode="Markdown", reply_markup=get_back_keyboard())
+        update.message.reply_text(
+            "🎟 Enter redeem code:",
+            parse_mode="Markdown",
+            reply_markup=get_back_keyboard()
+        )
         context.user_data['state'] = 'redeem_code'
     except Exception as e:
         logger.error(f"redeem error: {e}")
@@ -276,7 +326,12 @@ def redeem_process(update: Update, context: CallbackContext):
 
 def contact(update: Update, context: CallbackContext):
     try:
-        update.message.reply_text(f"📞 Admin: @{ADMIN_USERNAME}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Message", url=f"https://t.me/{ADMIN_USERNAME}")]]))
+        update.message.reply_text(
+            f"📞 Admin: @{ADMIN_USERNAME}",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Message", url=f"https://t.me/{ADMIN_USERNAME}")]
+            ])
+        )
     except Exception as e:
         logger.error(f"contact error: {e}")
         update.message.reply_text("❌ Error. Please try again.")
@@ -319,7 +374,11 @@ def admin_total_balance(update: Update, context: CallbackContext):
     c.execute("SELECT SUM(balance), COUNT(*) FROM users")
     total, users = c.fetchone()
     conn.close()
-    update.message.reply_text(f"💰 Total Balance\nUsers: {users}\nTotal Credits: {total or 0}", parse_mode="Markdown", reply_markup=get_admin_keyboard())
+    update.message.reply_text(
+        f"💰 Total Balance\nUsers: {users}\nTotal Credits: {total or 0}",
+        parse_mode="Markdown",
+        reply_markup=get_admin_keyboard()
+    )
 
 def admin_users_list(update: Update, context: CallbackContext):
     if update.effective_user.id != ADMIN_ID: return
@@ -399,7 +458,6 @@ def admin_state_handler(update: Update, context: CallbackContext):
             try:
                 context.bot.send_message(u[0], f"📢 Broadcast\n\n{msg}", parse_mode='Markdown')
                 success += 1
-                import time
                 time.sleep(0.05)
             except: pass
         update.message.reply_text(f"✅ Broadcast sent to {success} users!", reply_markup=get_admin_keyboard())
@@ -410,7 +468,10 @@ def admin_state_handler(update: Update, context: CallbackContext):
             code, amount, usages = parts[0].upper(), int(parts[1]), int(parts[2])
             c.execute("INSERT INTO redeem_codes (code, amount, usages, created_by) VALUES (?,?,?,?)", (code, amount, usages, user_id))
             conn.commit()
-            update.message.reply_text(f"✅ Code created!\n{code}\n{amount} credits\n{usages} uses", reply_markup=get_admin_keyboard())
+            update.message.reply_text(
+                f"✅ Code created!\n{code}\n{amount} credits\n{usages} uses",
+                reply_markup=get_admin_keyboard()
+            )
         except:
             update.message.reply_text("❌ Invalid! Use: CODE AMOUNT USAGES", parse_mode="Markdown")
         context.user_data['admin_state'] = None
@@ -457,7 +518,7 @@ def handle_message(update: Update, context: CallbackContext):
 def main():
     try:
         print("=" * 60)
-        print("📨 SMS SENDER BOT (Standalone)")
+        print("📨 SMS SENDER BOT (Full Standalone)")
         print("=" * 60)
         init_db()
         updater = Updater(BOT_TOKEN, use_context=True)
