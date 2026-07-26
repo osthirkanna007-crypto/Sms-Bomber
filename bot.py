@@ -900,6 +900,7 @@ async def health_check():
     while True:
         await asyncio.sleep(3600)
 
+# ===================== FINAL FIX: MAIN FUNCTION =====================
 async def main():
     try:
         print("=" * 60)
@@ -908,18 +909,31 @@ async def main():
         print(f"Admin: {ADMIN_ID}")
         print(f"DB: {DB_PATH}")
         print("=" * 60)
+        
         await init_db()
         asyncio.create_task(backup_database())
         asyncio.create_task(health_check())
+        
         app = Application.builder().token(BOT_TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+        
         print("Bot is RUNNING!")
         print("=" * 60)
-        await app.run_polling()
+        
+        # Correct way to start polling without event loop issues
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+        
+        # Keep the bot running
+        while True:
+            await asyncio.sleep(3600)
+            
     except Exception as e:
         logger.error(f"Main error: {e}")
         print(f"Error: {e}")
+        raise
 
 if __name__ == "__main__":
     try:
