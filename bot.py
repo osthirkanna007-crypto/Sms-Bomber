@@ -879,11 +879,11 @@ async def init_db():
     except Exception as e:
         logger.error(f"DB init error: {e}")
 
-# ===================== WEBHOOK SETUP (FINAL FIX) =====================
+# ===================== FIXED: SIMPLE POLLING (NO WEBHOOK) =====================
 async def main():
     try:
         print("=" * 60)
-        print("SMS BOMBER BOT STARTING WITH WEBHOOK...")
+        print("SMS BOMBER BOT STARTING (POLLING MODE)...")
         print(f"APIs: {len(WORKING_APIS)}")
         print(f"Admin: {ADMIN_ID}")
         print(f"DB: {DB_PATH}")
@@ -896,27 +896,12 @@ async def main():
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        print("Bot is RUNNING with Webhook!")
+        print("Bot is RUNNING!")
         print("=" * 60)
         
-        # Railway provides a public URL via PORT
-        port = int(os.getenv('PORT', 8080))
-        webhook_url = f"https://{os.getenv('RAILWAY_STATIC_URL', 'localhost')}/webhook"
+        # SIMPLE POLLING - This works perfectly on Railway
+        await app.run_polling()
         
-        # If RAILWAY_STATIC_URL is not set, use polling as fallback
-        if os.getenv('RAILWAY_STATIC_URL'):
-            await app.bot.set_webhook(webhook_url)
-            await app.run_webhook(listen="0.0.0.0", port=port, webhook_url=webhook_url)
-        else:
-            # Fallback to polling
-            print("No RAILWAY_STATIC_URL, using polling...")
-            await app.initialize()
-            await app.start()
-            await app.updater.start_polling()
-            
-            while True:
-                await asyncio.sleep(3600)
-            
     except Exception as e:
         logger.error(f"Main error: {e}")
         print(f"Error: {e}")
