@@ -153,6 +153,7 @@ def get_back_keyboard():
 def get_bombing_keyboard():
     return ReplyKeyboardMarkup([["⏹ Cancel Bomb"]], resize_keyboard=True)
 
+# ===================== HANDLERS =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     async with aiosqlite.connect(DB_PATH) as db:
@@ -454,6 +455,7 @@ async def contact(update, context):
         ])
     )
 
+# ===================== ADMIN HANDLERS (full set) =====================
 async def admin_add_credit(update, context):
     if update.effective_user.id != ADMIN_ID:
         return
@@ -879,29 +881,35 @@ async def init_db():
     except Exception as e:
         logger.error(f"DB init error: {e}")
 
-# ===================== FIXED: SIMPLE POLLING (NO WEBHOOK) =====================
+# ===================== FINAL FIX: MANUAL POLLING (NO run_polling) =====================
 async def main():
     try:
         print("=" * 60)
-        print("SMS BOMBER BOT STARTING (POLLING MODE)...")
+        print("SMS BOMBER BOT STARTING (MANUAL POLLING)...")
         print(f"APIs: {len(WORKING_APIS)}")
         print(f"Admin: {ADMIN_ID}")
         print(f"DB: {DB_PATH}")
         print("=" * 60)
-        
+
         await init_db()
         asyncio.create_task(backup_database())
-        
+
         app = Application.builder().token(BOT_TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-        
+
+        # Manual start - no run_polling() at all
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling()
+
         print("Bot is RUNNING!")
         print("=" * 60)
-        
-        # SIMPLE POLLING - This works perfectly on Railway
-        await app.run_polling()
-        
+
+        # Keep alive
+        while True:
+            await asyncio.sleep(3600)
+
     except Exception as e:
         logger.error(f"Main error: {e}")
         print(f"Error: {e}")
