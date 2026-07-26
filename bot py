@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 # ===================== এনভায়রনমেন্ট লোড =====================
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("8892555423:AAHcUvQgf2Y8byocmHuc9zgNLE-tD52nNL4")
 ADMIN_ID = int(os.getenv("ADMIN_ID", 1967494059))
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "RobiEntertainment")
 OWNER_USERNAME = os.getenv("OWNER_USERNAME", "RobiEntertainment")
